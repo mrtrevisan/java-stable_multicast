@@ -27,7 +27,7 @@ public class Client implements IStableMulticast {
 
     @Override
     public void deliver(String msg) {
-        System.out.println("Mensagem recebida: " + msg);
+        System.out.println("Mensagem recebida: " + msg + "\n");
     }
 
     public static void main(String[] args) {
@@ -36,11 +36,12 @@ public class Client implements IStableMulticast {
             String ip = LocalIPFinder.getIp();
             System.out.print("Digite a porta: ");
             int port = Integer.parseInt(scanner.nextLine());
+            System.out.println("");
 
             // Inicializando o cliente
             Client client = new Client(ip, port);
 
-            System.out.print("Digite mensagens para enviar: ");
+            System.out.print("Digite mensagens para enviar: \n");
             // Loop para enviar mensagens
             while (true) {
                 if(scanner.hasNextLine()) 

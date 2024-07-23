@@ -37,7 +37,7 @@ public class StableMulticast {
 
         // atualiza os clocks na inicialização
         updateVectorClocks(localId, 0);
-        System.out.println("Matriz de Relogios Logicos ao iniciar: \n" + stringMatrixClock());
+        System.out.println("Matriz de Relogios Logicos ao iniciar: " + stringMatrixClock());
 
         // inicializa o serviço de descoberta 
         startDiscoveryService();
@@ -78,10 +78,10 @@ public class StableMulticast {
                             // e atualiza o relógio vetorial
                             if (!groupMembers.contains(TempMember)) {
                                 groupMembers.add(TempMember);
-                                System.out.println("Membro Descoberto: " + TempMember);
+                                System.out.println("\nMembro Descoberto: " + TempMember + "\n");
                                 updateVectorClocks(host+":"+port, -1);
 
-                                System.out.println("Matriz de Relogios Logicos ao descobrir membro: \n" + stringMatrixClock());
+                                System.out.println("Matriz de Relogios Logicos ao descobrir membro: " + stringMatrixClock());
                             }
                         }
                     }
@@ -208,7 +208,7 @@ public class StableMulticast {
         }
         
         this.vectorClocks.put(message.split("@")[1], tempMap);
-        System.out.println("Matriz de Relogios Logicos: \n" + stringMatrixClock());
+        System.out.println("Matriz de Relogios Logicos: " + stringMatrixClock());
     }
     // manda unicast para um membro do grupo
     public void sendUnicast(String msg, InetSocketAddress member) {
@@ -240,6 +240,7 @@ public class StableMulticast {
             Scanner scanner = new Scanner(System.in);
             System.out.println("Enviar a mensagem em Mulicast ? (S/N)");
             String confirm = scanner.nextLine();
+            System.out.println("");
 
             updateVectorClocks(localId, getClockVal(localId) +1);
             String msg_ = msg + "@" + localId + "@" + stringVectorClock();
@@ -250,9 +251,9 @@ public class StableMulticast {
             } else {
                 // unicast para cada membro do grupo
                 for (InetSocketAddress member : this.getGroupMembers()) {
-                    System.out.print("Enviar para " + member + "? (s/n): ");
+                    System.out.print("Enviar para " + member + "? (S/N): ");
                     String sendToMember = scanner.nextLine();
-
+                    System.out.println("");
                     if (sendToMember.equalsIgnoreCase("s")) {
                         this.sendUnicast(msg_, member);
                     }
@@ -262,6 +263,7 @@ public class StableMulticast {
             e.printStackTrace();
         }
 
+        System.out.println("Matriz de Relogios Logicos: " + stringMatrixClock());
     }
     // funcao para print do buffer de mensagens
     private String stringMessageBuffer() {
@@ -271,24 +273,26 @@ public class StableMulticast {
             
             sb.append(key + ": {");
             for (String msg : messages) {
-                sb.append(msg + ", ");
+                sb.append("\n\t" + msg + ", ");
             }
-            sb.append("}\n");
+            sb.append("\n}\n");
         }
         return sb.toString();
     }
     // funcao para print da matriz de relogios 
     private String stringMatrixClock() {
         StringBuilder sb = new StringBuilder();
+        sb.append("[");
         for (String key : vectorClocks.keySet()) {
             Map<String, Integer> clock = vectorClocks.get(key);
             
-            sb.append(key + ": [");
+            sb.append("\n\t" + key + ": [");
             for (String key2 : clock.keySet()) {
-                sb.append(key2 + ":" + clock.get(key2) + ", ");
+                sb.append("\n\t\t" + key2 + ": " + clock.get(key2) + ", ");
             }
-            sb.append("]\n");
+            sb.append("\n\t],");
         }
+        sb.append("\n]\n");
         return sb.toString();
     }
 
@@ -329,7 +333,7 @@ public class StableMulticast {
     
                 // Remove a mensagem do buffer
                 if (canExclude) {
-                    System.out.println("Excluindo mensagem estavel: " + msg);
+                    System.out.println("Excluindo mensagem estavel: " + msg + "\n");
                     toExcludeMsgs.add(msg);
                 }
             }
