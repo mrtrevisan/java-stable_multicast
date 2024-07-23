@@ -4,14 +4,16 @@ import java.net.*;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
+@SuppressWarnings("deprecation")
 public class StableMulticast {
     private String ip;
     private Integer port;
-
     private IStableMulticast client;
+    private String localId;
+    
     private List<InetSocketAddress> groupMembers;
     private DatagramSocket socket;
-    private MulticastSocket multicastSocket;
+
     private InetAddress groupAddress;
 
     private Thread discoveryThread;
@@ -20,57 +22,114 @@ public class StableMulticast {
     private Map<String, int[]> vectorClocks; // Para armazenar os relógios vetoriais
     private int[] localVectorClock;
 
-    @SuppressWarnings("deprecation")
+    private String multicastIp = "230.0.0.0";
+    private int multicastPort = 4446;
+
     public StableMulticast(String ip, Integer port, IStableMulticast client) throws IOException {
         this.ip = ip;
         this.port = port;
         this.client = client;
         this.groupMembers = Collections.synchronizedList(new ArrayList<>());
+        this.localId = InetAddress.getLocalHost().getHostName() + ":" + port;
+
+
         this.messageBuffer = new ConcurrentHashMap<>();
         this.vectorClocks = new ConcurrentHashMap<>();
         
         this.localVectorClock = new int[10]; // Supondo um máximo de 10 processos no grupo
         
-        this.socket = new DatagramSocket();
-        this.multicastSocket = new MulticastSocket(this.port);
+        this.socket = new DatagramSocket(port);
         this.groupAddress = InetAddress.getByName(this.ip);
 
-       
-        System.out.println("Joining multicast group: " + groupAddress + " on port: " + port);
-        multicastSocket.joinGroup(groupAddress);
-        System.out.println("Joined multicast group successfully.");
-
         startDiscoveryService();
+        sendHello();
         startMessageReceiver();
     }
 
     private void startDiscoveryService() {
-        discoveryThread = new Thread(() -> {
-            try {
-                while (true) {
-                    byte[] buf = new byte[256];
-                    DatagramPacket packet = new DatagramPacket(buf, buf.length);
+        try {
+            new Thread(() -> {
+                try (MulticastSocket multicastSocket = new MulticastSocket(multicastPort);){
+                    InetAddress group = InetAddress.getByName(multicastIp);
+                    multicastSocket.joinGroup(group);
 
-                    // aguarda por mensagens de usuários entrando
-                    System.out.println("Waiting to receive a packet...");
-                    multicastSocket.receive(packet); // Bloqueia até que um pacote seja recebido
-                    System.out.println("Packet received!");
-                    InetSocketAddress address = new InetSocketAddress(packet.getAddress(), packet.getPort());
+                    while (true) {
+                        byte[] buf = new byte[256];
+                        DatagramPacket packet = new DatagramPacket(buf, buf.length);
+                        multicastSocket.receive(packet);
 
-                    // adiciona o usuário aos membros do grupo, caso ele não esteja lá
-                    if (!groupMembers.contains(address)) {
-                        System.out.println("address adicionado:" + address);
-                        groupMembers.add(address);
-                    } else {
-                        System.out.println("Address already in group: " + address);
+                        String received = new String(packet.getData(), 0, packet.getLength());
+                        String[] parts = received.split(":");
+
+                        if (parts[0].equals("SYSTEMHello") && (!(parts[1]+ ":" +parts[2]).equals(localId))) {
+                            // System.out.println(parts[0] + "///" + parts[1] + "///" + parts[2] + "///" + localId);
+                            String host = parts[1];
+                            int port = Integer.parseInt(parts[2]);
+                            
+                            InetSocketAddress TempMember = new InetSocketAddress(InetAddress.getByName(host), port);
+                            // Adiciona o membro ao grupo, caso ele não esteja lá
+                            if (!groupMembers.contains(TempMember)) {
+                                groupMembers.add(TempMember);
+                                System.out.println("Membro Descoberto: " + TempMember);
+                            }
+                        }
                     }
+                } catch (Exception e) {
+                    e.printStackTrace();
                 }
-            } catch (IOException e) {
+            }).start();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+
+        // discoveryThread = new Thread(() -> {
+        //     try {
+        //         while (true) {
+        //             byte[] buf = new byte[256];
+        //             DatagramPacket packet = new DatagramPacket(buf, buf.length);
+
+        //             // aguarda por mensagens de usuários entrando
+        //             System.out.println("Waiting to receive a packet...");
+        //             multicastSocket.receive(packet); // Bloqueia até que um pacote seja recebido
+        //             System.out.println("Packet received!");
+        //             InetSocketAddress address = new InetSocketAddress(packet.getAddress(), packet.getPort());
+
+        //             // adiciona o usuário aos membros do grupo, caso ele não esteja lá
+        //             if (!groupMembers.contains(address)) {
+        //                 System.out.println("address adicionado:" + address);
+        //                 groupMembers.add(address);
+        //             } else {
+        //                 System.out.println("Address already in group: " + address);
+        //             }
+        //         }
+        //     } catch (IOException e) {
+        //         e.printStackTrace();
+        //     }
+        // });
+
+        // discoveryThread.start();
+    }
+
+    private void sendHello()
+    {
+        new Thread( () -> {
+            try ( MulticastSocket multicastSocket = new MulticastSocket(multicastPort);) {
+                InetAddress group = InetAddress.getByName(multicastIp);
+                multicastSocket.joinGroup(group);
+                
+                String msg = "SYSTEMHello:"+ localId;
+                byte[] data = msg.getBytes();
+                DatagramPacket hello = new DatagramPacket(data, data.length, group, multicastPort);
+                
+                while (true) {
+                    multicastSocket.send(hello);
+                    Thread.sleep(2000);
+                }
+            } catch (Exception e) {
                 e.printStackTrace();
             }
-        });
-
-        discoveryThread.start();
+        }).start();
     }
 
     private void startMessageReceiver() {
@@ -96,10 +155,10 @@ public class StableMulticast {
         if (!messageBuffer.containsKey(message)) {
             messageBuffer.put(message, false);
             client.deliver(message);
-            updateVectorClocks(message);
+            // updateVectorClocks(message);
             messageBuffer.put(message, true);
         }
-        printStatus();
+        //printStatus();
     }
 
     private void updateVectorClocks(String message) {
@@ -137,7 +196,9 @@ public class StableMulticast {
 
     public void sendUnicast(String msg, InetSocketAddress member) {
         try {
-            byte[] buf = msg.getBytes();
+            String msg_ = msg + "@" + localId;
+
+            byte[] buf = msg_.getBytes();
             DatagramPacket packet = new DatagramPacket(buf, buf.length, member.getAddress(), member.getPort());
             socket.send(packet);
         } catch (IOException e) {
@@ -145,19 +206,49 @@ public class StableMulticast {
         }
     }
 
-    public void msend(String msg, IStableMulticast client) {
+    public void sendMulticast(String msg) {
         try {
-            localVectorClock[0]++; // Incrementa o relógio vetorial local
-            byte[] buf = msg.getBytes();
+            String msg_ = msg + "@" + localId;
+
+            byte[] buf = msg_.getBytes();
             for (InetSocketAddress member : groupMembers) {
                 DatagramPacket packet = new DatagramPacket(buf, buf.length, member.getAddress(), member.getPort());
                 socket.send(packet);
             }
-            vectorClocks.put(msg, localVectorClock.clone());
         } catch (IOException e) {
             e.printStackTrace();
         }
-        printStatus();
+    }
+    public void msend(String msg, IStableMulticast client) {
+        try{
+            // localVectorClock[0]++; // Incrementa o relógio vetorial local
+            Scanner scanner = new Scanner(System.in);
+            System.out.println("Enviar a mensagem em Mulicast ? (S/N)");
+            String confirm = scanner.nextLine();
+
+            if (confirm.equalsIgnoreCase("s")) {
+                // multicast para todos os membros do grupo
+                sendMulticast(msg);
+            } else {
+                // unicast para cada membro do grupo
+                for (InetSocketAddress member : this.getGroupMembers()) {
+                    System.out.print("Enviar para " + member + "? (s/n): ");
+                    String sendToMember = scanner.nextLine();
+
+                    if (sendToMember.equalsIgnoreCase("s")) {
+                        this.sendUnicast(msg, member);
+                    }
+                }
+            }
+            // vectorClocks.put(msg, localVectorClock.clone());
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        // printStatus();
+
+        // Message message = new Message(msg, Arrays.copyOf(localClock, localClock.length), localId);
+        // localClock[getLocalIndex()]++;
+
     }
 
     private void printStatus() {

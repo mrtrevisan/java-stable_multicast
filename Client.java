@@ -30,17 +30,28 @@ public class Client implements IStableMulticast {
     }
 
     public static void main(String[] args) {
-        try {
-            // Definindo o endereço IP e porta do grupo multicast
-            String ip = "230.0.0.0";
-            int port = 4321;
+        try (Scanner scanner = new Scanner(System.in)) {
+            // Configuração do IP e porta do usuário
+            // System.out.print("Enter your IP address: ");
+            // String ip = scanner.nextLine();
+            String ip = LocalIPFinder.getIp();
+
+            System.out.print("Digite a porta: ");
+            int port = Integer.parseInt(scanner.nextLine());
 
             // Inicializando o cliente
             Client client = new Client(ip, port);
 
-            // Gerenciando a interface de usuário para enviar mensagens
-            client.startUserInterface();
-        } catch (IOException e) {
+            System.out.print("Digite mensagens para enviar: ");
+            // Loop para enviar mensagens
+            while (true) {
+                if(scanner.hasNextLine()) 
+                {
+                    String msg = scanner.nextLine();
+                    client.multicast.msend(msg, client);
+                }
+            }
+        } catch (Exception e) {
             e.printStackTrace();
         }
     }
