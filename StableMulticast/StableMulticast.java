@@ -4,7 +4,6 @@ import java.net.*;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
-@SuppressWarnings("deprecation")
 public class StableMulticast {
     private IStableMulticast client;
     private String localId;
@@ -47,10 +46,8 @@ public class StableMulticast {
         startMessageReceiver();
     }
 
-    // Serviço paralelo que escuta mensagens de "Hello"
-    // e adiciona membros a lista de membros
-    // mensagens de Hello começam com SYSTEMHello,
-    // seguido do ID do processo que enviou 
+    // Serviço paralelo que escuta mensagens de "Hello" e adiciona membros a lista de membros
+    // mensagens de Hello começam com SYSTEMHello, seguido do ID do processo que enviou 
     private void startDiscoveryService() {
         try {
             new Thread(() -> {
@@ -210,6 +207,7 @@ public class StableMulticast {
         this.vectorClocks.put(message.split("@")[1], tempMap);
         System.out.println("Matriz de Relogios Logicos: " + stringMatrixClock());
     }
+    
     // manda unicast para um membro do grupo
     public void sendUnicast(String msg, InetSocketAddress member) {
         try {
@@ -220,6 +218,7 @@ public class StableMulticast {
             e.printStackTrace();
         }
     }
+    
     // manda multicast para todos os membros do grupo
     public void sendMulticast(String msg) {
         try {
@@ -265,6 +264,7 @@ public class StableMulticast {
 
         System.out.println("Matriz de Relogios Logicos: " + stringMatrixClock());
     }
+    
     // funcao para print do buffer de mensagens
     private String stringMessageBuffer() {
         StringBuilder sb = new StringBuilder();
@@ -279,6 +279,7 @@ public class StableMulticast {
         }
         return sb.toString();
     }
+    
     // funcao para print da matriz de relogios 
     private String stringMatrixClock() {
         StringBuilder sb = new StringBuilder();
@@ -320,14 +321,14 @@ public class StableMulticast {
 
                 for (Map<String, Integer> vectorClock : vectorClocks.values()) {
                     // Checa se todos os relógios vetoriais são maiores que o relógio vetorial da mensagem do sender
-                    if (vectorClock.get(sender) <= tempMap.get(sender)) {
+                    if (vectorClock.get(sender) < tempMap.get(sender)) {
                         canExclude = false;
                         break;
                     }
                 }
     
                 // Checa se o relógio local é maior que o relógio vetorial da mensagem do sender
-                if (localVectorClock.get(sender) <= tempMap.get(sender)) {
+                if (localVectorClock.get(sender) < tempMap.get(sender)) {
                     canExclude = false;
                 }
     
